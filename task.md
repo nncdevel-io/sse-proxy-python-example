@@ -23,21 +23,21 @@
 
 | ID | Status | Summary | DependsOn |
 | ---- | ---- | ---- | ---- |
-| TASK-001 | ⏳ | Python プロジェクト骨格を作成する | - |
-| TASK-002 | ⏳ | Web API と HTTP client 依存関係を追加する | TASK-001 |
-| TASK-003 | ⏳ | LLM 接続先の設定モデルを実装する | TASK-002 |
-| TASK-004 | ⏳ | SSE proxy 用のリクエストモデルを定義する | TASK-003 |
-| TASK-005 | ⏳ | OpenAI SDK endpoint を実装する | TASK-004 |
-| TASK-006 | ⏳ | httpx endpoint を実装する | TASK-004 |
-| TASK-007 | ⏳ | aiohttp endpoint を実装する | TASK-004 |
-| TASK-008 | ⏳ | SSE 中継の共通処理を実装する | TASK-005,TASK-006,TASK-007 |
-| TASK-009 | ⏳ | エラー応答と切断時処理を実装する | TASK-008 |
-| TASK-010 | ⏳ | Structured Outputs 用入力を追加する | TASK-009 |
-| TASK-011 | ⏳ | Docker 実行環境を追加する | TASK-010 |
-| TASK-012 | ⏳ | proxy 動作確認用の手順を追加する | TASK-011 |
-| TASK-013 | ⏳ | 単体テストと接続確認テストを追加する | TASK-012 |
-| TASK-014 | ⏳ | README に起動方法と利用例を記載する | TASK-013 |
-| TASK-015 | ⏳ | lint とテストで完了確認する | TASK-014 |
+| TASK-001 | ✅ | Python プロジェクト骨格を作成する | - |
+| TASK-002 | ✅ | Web API と HTTP client 依存関係を追加する | TASK-001 |
+| TASK-003 | ✅ | LLM 接続先の設定モデルを実装する | TASK-002 |
+| TASK-004 | ✅ | SSE proxy 用のリクエストモデルを定義する | TASK-003 |
+| TASK-005 | ✅ | OpenAI SDK endpoint を実装する | TASK-004 |
+| TASK-006 | ✅ | httpx endpoint を実装する | TASK-004 |
+| TASK-007 | ✅ | aiohttp endpoint を実装する | TASK-004 |
+| TASK-008 | ✅ | SSE 中継の共通処理を実装する | TASK-005,TASK-006,TASK-007 |
+| TASK-009 | ✅ | エラー応答と切断時処理を実装する | TASK-008 |
+| TASK-010 | ✅ | Structured Outputs 用入力を追加する | TASK-009 |
+| TASK-011 | ✅ | Docker 実行環境を追加する | TASK-010 |
+| TASK-012 | ✅ | proxy 動作確認用の手順を追加する | TASK-011 |
+| TASK-013 | ✅ | 単体テストと接続確認テストを追加する | TASK-012 |
+| TASK-014 | ✅ | README に起動方法と利用例を記載する | TASK-013 |
+| TASK-015 | ✅ | lint とテストで完了確認する | TASK-014 |
 
 ## タスク詳細（補足が必要な場合のみ）
 
