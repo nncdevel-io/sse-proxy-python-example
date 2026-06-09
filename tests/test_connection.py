@@ -1,39 +1,40 @@
-import os
-
 import httpx
 import pytest
 
 
 @pytest.mark.asyncio
-async def test_optional_llm_connection_streams_sse_when_environment_is_set() -> None:
-    base_url = os.getenv("LLM_CONNECTION_TEST_BASE_URL")
-    api_key = os.getenv("LLM_CONNECTION_TEST_API_KEY", "ollama")
-    model = os.getenv("LLM_CONNECTION_TEST_MODEL")
-
-    if base_url is None or model is None:
-        pytest.skip("LLM_CONNECTION_TEST_BASE_URL and LLM_CONNECTION_TEST_MODEL are not set")
+async def test_mock_llm_connection_streams_sse() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == "https://llm.example.test/v1/responses"
+        assert request.headers["authorization"] == "Bearer test-key"
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=b"event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n",
+        )
 
     payload = {
-        "model": model,
+        "model": "test-model",
         "input": "Reply with one short sentence.",
         "stream": True,
     }
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": "Bearer test-key",
         "Accept": "text/event-stream",
         "Content-Type": "application/json",
     }
+    transport = httpx.MockTransport(handler)
 
     async with (
-        httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=30.0)) as client,
+        httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(30.0, read=30.0)) as client,
         client.stream(
             "POST",
-            base_url.rstrip("/") + "/responses",
+            "https://llm.example.test/v1/responses",
             headers=headers,
             json=payload,
         ) as response,
     ):
-        assert response.status_code < 300
-        first_chunk = await response.aiter_bytes().__anext__()
+        assert response.status_code == 200
+        body = b"".join([chunk async for chunk in response.aiter_bytes()])
 
-    assert first_chunk
+    assert body == b"event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n"

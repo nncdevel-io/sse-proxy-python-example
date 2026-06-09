@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 
-from sse_proxy_python_example.app import create_app
+from sse_proxy_python_example.app import build_startup_log_lines, create_app
 from sse_proxy_python_example.config import Settings
 
 
@@ -17,6 +17,22 @@ def test_access_urls_include_health_and_proxy_endpoints() -> None:
         "httpx: http://localhost:18000/httpx/responses",
         "aiohttp: http://localhost:18000/aiohttp/responses",
     ]
+
+
+def test_startup_log_lines_report_ssl_cert_file_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SSL_CERT_FILE", "/path/to/corporate-ca.pem")
+
+    assert "SSL_CERT_FILE: /path/to/corporate-ca.pem" in build_startup_log_lines(
+        ["Health check: http://localhost:18000/healthz"]
+    )
+
+
+def test_startup_log_lines_report_ssl_cert_file_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+
+    assert "SSL_CERT_FILE: unset" in build_startup_log_lines(
+        ["Health check: http://localhost:18000/healthz"]
+    )
 
 
 async def fake_stream(payload: dict[str, object]) -> AsyncIterator[bytes]:

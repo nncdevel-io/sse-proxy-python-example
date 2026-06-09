@@ -1,21 +1,39 @@
 import asyncio
 import json
+import logging
+import ssl
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import aiohttp
 import httpx
-from openai import AsyncOpenAI
+from openai import APIError, AsyncOpenAI, DefaultAsyncHttpxClient
 
 from sse_proxy_python_example.config import Settings
 
 Streamer = Callable[[dict[str, Any]], AsyncIterator[bytes]]
+logger = logging.getLogger("uvicorn.error")
 
 
 class UpstreamError(Exception):
     def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+def create_ssl_context() -> ssl.SSLContext:
+    context = ssl.create_default_context()
+    if hasattr(ssl, "VERIFY_X509_STRICT"):
+        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    return context
+
+
+def get_httpx_verify() -> ssl.SSLContext:
+    return create_ssl_context()
+
+
+def get_aiohttp_connector() -> aiohttp.TCPConnector:
+    return aiohttp.TCPConnector(ssl=create_ssl_context())
 
 
 def error_event(message: str) -> bytes:
@@ -39,17 +57,24 @@ async def proxy_event_stream(stream: AsyncIterator[bytes]) -> AsyncIterator[byte
     except asyncio.CancelledError:
         raise
     except Exception as exc:
+        logger.exception("LLM upstream stream failed")
         yield error_event(_safe_error_message(exc))
 
 
 async def stream_openai_sdk(settings: Settings, payload: dict[str, Any]) -> AsyncIterator[bytes]:
-    client = AsyncOpenAI(base_url=str(settings.base_url), api_key=settings.api_key_value)
+    client = AsyncOpenAI(
+        base_url=str(settings.base_url),
+        api_key=settings.api_key_value,
+        http_client=DefaultAsyncHttpxClient(verify=get_httpx_verify()),
+    )
     try:
         stream = await client.responses.create(**payload)
         async for event in stream:
             event_type = getattr(event, "type", "message")
             event_data = event.model_dump_json()
             yield f"event: {event_type}\ndata: {event_data}\n\n".encode()
+    except APIError as exc:
+        raise UpstreamError(str(exc)) from exc
     except Exception as exc:
         raise UpstreamError("OpenAI SDK stream failed.") from exc
     finally:
@@ -66,7 +91,7 @@ async def stream_httpx(settings: Settings, payload: dict[str, Any]) -> AsyncIter
     timeout = httpx.Timeout(settings.request_timeout, read=None)
 
     async with (
-        httpx.AsyncClient(timeout=timeout) as client,
+        httpx.AsyncClient(timeout=timeout, verify=get_httpx_verify()) as client,
         client.stream("POST", url, headers=headers, json=payload) as response,
     ):
         if response.status_code < 200 or response.status_code >= 300:
@@ -86,7 +111,11 @@ async def stream_aiohttp(settings: Settings, payload: dict[str, Any]) -> AsyncIt
     timeout = aiohttp.ClientTimeout(total=settings.request_timeout, sock_read=None)
 
     async with (
-        aiohttp.ClientSession(timeout=timeout) as session,
+        aiohttp.ClientSession(
+            timeout=timeout,
+            trust_env=True,
+            connector=get_aiohttp_connector(),
+        ) as session,
         session.post(url, headers=headers, json=payload) as response,
     ):
         if response.status < 200 or response.status >= 300:

@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -16,7 +17,7 @@ from sse_proxy_python_example.streaming import (
 )
 
 AppStreamer = Callable[[dict[str, Any]], AsyncIterator[bytes]]
-logger = logging.getLogger("sse_proxy_python_example")
+logger = logging.getLogger("uvicorn.error")
 
 
 def build_access_urls(settings: Settings) -> list[str]:
@@ -26,6 +27,15 @@ def build_access_urls(settings: Settings) -> list[str]:
         f"OpenAI Python SDK: {base_url}/openai-python/responses",
         f"httpx: {base_url}/httpx/responses",
         f"aiohttp: {base_url}/aiohttp/responses",
+    ]
+
+
+def build_startup_log_lines(access_urls: list[str]) -> list[str]:
+    ssl_cert_file = os.environ.get("SSL_CERT_FILE") or "unset"
+    return [
+        "SSE proxy access URLs:",
+        *[f"  {line}" for line in access_urls],
+        f"SSL_CERT_FILE: {ssl_cert_file}",
     ]
 
 
@@ -56,9 +66,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        logger.info("SSE proxy access URLs:")
-        for line in app.state.access_urls:
-            logger.info("  %s", line)
+        for line in app.state.startup_log_lines:
+            logger.info("%s", line)
         yield
 
     app = FastAPI(title="SSE Proxy Python Example", lifespan=lifespan)
@@ -67,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.httpx_streamer = _bind_streamer(resolved_settings, stream_httpx)
     app.state.aiohttp_streamer = _bind_streamer(resolved_settings, stream_aiohttp)
     app.state.access_urls = build_access_urls(resolved_settings)
+    app.state.startup_log_lines = build_startup_log_lines(app.state.access_urls)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

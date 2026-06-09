@@ -43,7 +43,7 @@ Or start it with the OpenAI API.
 ```bash
 LLM_BASE_URL=https://api.openai.com/v1/ \
 LLM_API_KEY="$OPENAI_API_KEY" \
-LLM_MODEL=gpt-4.1-mini \
+LLM_MODEL=gpt-5-mini \
 uv run uvicorn sse_proxy_python_example.app:app --reload
 ```
 
@@ -63,6 +63,7 @@ curl -N http://127.0.0.1:8000/httpx/responses \
 | `LLM_API_KEY` | `ollama` | API key sent to the upstream server |
 | `LLM_MODEL` | `llama3.2` | Model name sent to `/responses` |
 | `LLM_REQUEST_TIMEOUT` | `120.0` | Upstream request timeout in seconds |
+| `LLM_PUBLIC_BASE_URL` | `http://127.0.0.1:8000` | Base URL printed in startup logs |
 
 ## Local Run
 
@@ -94,7 +95,7 @@ embedding it in the image.
 docker run --rm -p 8000:8000 \
   -e LLM_BASE_URL=https://api.openai.com/v1/ \
   -e LLM_API_KEY="$OPENAI_API_KEY" \
-  -e LLM_MODEL=gpt-4.1-mini \
+  -e LLM_MODEL=gpt-5-mini \
   sse-proxy-python-example
 ```
 
@@ -156,7 +157,7 @@ Then run one of the `curl -N` commands above.
 ```bash
 LLM_BASE_URL=https://api.openai.com/v1/ \
 LLM_API_KEY="$OPENAI_API_KEY" \
-LLM_MODEL=gpt-4.1-mini \
+LLM_MODEL=gpt-5-mini \
 uv run uvicorn sse_proxy_python_example.app:app --reload
 ```
 
@@ -173,12 +174,51 @@ uv run pyright
 markdownlint-cli2 README.md task.md .markdownlint-cli2.jsonc
 ```
 
-Optional connection testing runs only when both required environment variables
-are set.
+## Corporate Proxy With Custom CA
+
+Use this setup when the LLM API must be reached through a corporate proxy that
+uses a private corporate root CA. The upstream HTTP clients use standard proxy
+and Python SSL environment variables.
+
+The app keeps TLS certificate verification enabled. For Python 3.13, it removes
+only the stricter X.509 verification flag that can reject some corporate proxy
+certificates with errors such as `Missing Authority Key Identifier`.
 
 ```bash
-LLM_CONNECTION_TEST_BASE_URL=http://localhost:11434/v1/ \
-LLM_CONNECTION_TEST_API_KEY=ollama \
-LLM_CONNECTION_TEST_MODEL=llama3.2 \
-uv run pytest tests/test_connection.py
+export HTTPS_PROXY=http://proxy.example.com:8080
+export HTTP_PROXY=http://proxy.example.com:8080
+export NO_PROXY=localhost,127.0.0.1
 ```
+
+Export the corporate root CA as a PEM file and point Python/httpx at it with
+`SSL_CERT_FILE`. Do not disable TLS verification.
+
+```bash
+SSL_CERT_FILE=/path/to/corporate-ca.pem \
+LLM_BASE_URL=https://api.openai.com/v1/ \
+LLM_API_KEY="$OPENAI_API_KEY" \
+LLM_MODEL=gpt-5-mini \
+uv run uvicorn sse_proxy_python_example.app:app --reload
+```
+
+Use `SSL_CERT_DIR` instead when your environment provides a hashed certificate
+directory.
+
+For Docker, mount the CA file and pass the same variables into the container.
+
+```bash
+docker run --rm -p 8000:8000 \
+  -e LLM_BASE_URL=https://api.openai.com/v1/ \
+  -e LLM_API_KEY="$OPENAI_API_KEY" \
+  -e LLM_MODEL=gpt-5-mini \
+  -e SSL_CERT_FILE=/etc/ssl/certs/corporate-ca.pem \
+  -e HTTPS_PROXY \
+  -e HTTP_PROXY \
+  -e NO_PROXY \
+  -v /path/to/corporate-ca.pem:/etc/ssl/certs/corporate-ca.pem:ro \
+  sse-proxy-python-example
+```
+
+If a request returns `event: error`, check the server log. Upstream connection
+exceptions are logged there while the SSE response keeps secret values out of
+the client-visible error body.
