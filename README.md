@@ -1,4 +1,4 @@
-# sse-proxy-python-example
+# SSE Proxy Python Example
 
 ストリーミング API レスポンスを SSE として中継する Python 実装例です。
 
@@ -30,9 +30,18 @@ API key は受け取りません。
 uv sync
 ```
 
-Ollama などのローカル OpenAI 互換 server を使う場合は、次のように起動します。
+Ollama などのローカル OpenAI 互換 server を使う場合は、先に Ollama server と
+model を準備してから、このアプリを起動します。
 
 ```bash
+ollama serve
+```
+
+別の terminal で model を pull し、このアプリを起動します。
+
+```bash
+ollama pull llama3.2
+
 LLM_BASE_URL=http://localhost:11434/v1/ \
 LLM_API_KEY=ollama \
 LLM_MODEL=llama3.2 \
@@ -120,6 +129,83 @@ curl -N http://127.0.0.1:8000/aiohttp/responses \
   -d "$payload"
 ```
 
+## 性能比較
+
+Ollama などのローカル server に向けて、同じ request body を各 endpoint へ
+繰り返し送ると、end-to-end の所要時間を比較できます。OpenAI API に対して
+大量に実行すると費用や rate limit の影響があるため、まずローカル環境で確認します。
+
+順序による偏りを避けるため、3つの endpoint の実行順を入れ替えながら測ります。
+
+```bash
+/bin/bash <<'BASH'
+payload='{"input":"Write one short sentence about SSE."}'
+per_round=20
+orders=(
+  "openai-python httpx aiohttp"
+  "openai-python aiohttp httpx"
+  "httpx openai-python aiohttp"
+  "httpx aiohttp openai-python"
+  "aiohttp openai-python httpx"
+  "aiohttp httpx openai-python"
+)
+
+for order in "${orders[@]}"; do
+  echo "== ${order} =="
+  for endpoint in $order; do
+    i=0
+    while [ "$i" -lt "$per_round" ]; do
+      curl -sS -o /dev/null "http://127.0.0.1:8000/$endpoint/responses" \
+        -w "${endpoint} %{time_total}\n" \
+        -H "Content-Type: application/json" \
+        -d "$payload" || exit 1
+      i=$((i + 1))
+    done
+  done
+done
+BASH
+```
+
+結果を見るときは、平均値だけでなく失敗回数、最小値、最大値も確認します。
+上流 model の速度、初回 load、CPU/GPU、同時実行数の影響を受けるため、
+client 実装だけを比較したい場合は、実 LLM ではなく固定応答を返す
+OpenAI 互換 mock server を使ってください。
+
+1万回など大きい回数で見る場合は、`per_round` を増やします。
+
+```bash
+per_round=1667
+```
+
+6通りの順序で実行するため、`per_round=1667` では各 endpoint 約1万回になります。
+
+2026-06-10 にローカル Ollama (`llama3.2`) へ warmup を各 endpoint 10回ずつ
+投げたあと、各 endpoint 120回ずつ投げた結果は次のとおりです。
+
+| Endpoint | 回数 | 失敗 | 平均秒 | 最小秒 | 最大秒 |
+| ---- | ----: | ----: | ----: | ----: | ----: |
+| `/openai-python/responses` | 120 | 0 | 0.491 | 0.372 | 0.850 |
+| `/aiohttp/responses` | 120 | 0 | 0.491 | 0.304 | 0.797 |
+| `/httpx/responses` | 120 | 0 | 0.500 | 0.319 | 0.768 |
+
+固定順で簡単に見るだけなら、次のようにも実行できます。
+
+```bash
+payload='{"input":"Write one short sentence about SSE."}'
+count=100
+
+for endpoint in openai-python httpx aiohttp; do
+  echo "== ${endpoint} =="
+  i=0
+  while [ "$i" -lt "$count" ]; do
+    curl -sS -o /dev/null "http://127.0.0.1:8000/$endpoint/responses" \
+      -H "Content-Type: application/json" \
+      -d "$payload" || exit 1
+    i=$((i + 1))
+  done
+done
+```
+
 ## Structured Outputs 例
 
 ```bash
@@ -142,6 +228,20 @@ curl -N http://127.0.0.1:8000/httpx/responses \
 ## Ollama 確認
 
 OpenAI 互換 API として動く Ollama server を起動してから、このアプリを起動します。
+
+1つ目の terminal で Ollama server を起動し、そのまま起動しておきます。
+
+```bash
+ollama serve
+```
+
+2つ目の terminal で、使用する model を pull します。
+
+```bash
+ollama pull llama3.2
+```
+
+同じ terminal で Python アプリを起動します。
 
 ```bash
 LLM_BASE_URL=http://localhost:11434/v1/ \
