@@ -67,9 +67,7 @@ async def test_openai_python_endpoint_returns_event_stream() -> None:
     transport = httpx.ASGITransport(app=app)
     async with (
         httpx.AsyncClient(transport=transport, base_url="http://testserver") as client,
-        client.stream(
-            "POST", "/openai-python/responses", json={"input": "hello"}
-        ) as response,
+        client.stream("POST", "/openai-python/responses", json={"input": "hello"}) as response,
     ):
         body = b"".join([chunk async for chunk in response.aiter_bytes()])
 
