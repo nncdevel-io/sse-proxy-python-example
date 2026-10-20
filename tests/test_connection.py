@@ -10,7 +10,7 @@ async def test_mock_llm_connection_streams_sse() -> None:
         return httpx.Response(
             200,
             headers={"content-type": "text/event-stream"},
-            content=b"event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n",
+            content=b'event: response.output_text.delta\ndata: {"delta":"ok"}\n\n',
         )
 
     payload = {
@@ -37,4 +37,4 @@ async def test_mock_llm_connection_streams_sse() -> None:
         assert response.status_code == 200
         body = b"".join([chunk async for chunk in response.aiter_bytes()])
 
-    assert body == b"event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n"
+    assert body == b'event: response.output_text.delta\ndata: {"delta":"ok"}\n\n'

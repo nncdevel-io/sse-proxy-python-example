@@ -7,7 +7,7 @@ from typing import Any
 
 import aiohttp
 import httpx
-from openai import APIError, AsyncOpenAI, DefaultAsyncHttpxClient
+from openai import APIError, AsyncOpenAI, DefaultAsyncHttpx2Client
 
 from sse_proxy_python_example.config import Settings
 
@@ -65,7 +65,7 @@ async def stream_openai_sdk(settings: Settings, payload: dict[str, Any]) -> Asyn
     client = AsyncOpenAI(
         base_url=str(settings.base_url),
         api_key=settings.api_key_value,
-        http_client=DefaultAsyncHttpxClient(verify=get_httpx_verify()),
+        http_client=DefaultAsyncHttpx2Client(verify=get_httpx_verify()),
     )
     try:
         stream = await client.responses.create(**payload)

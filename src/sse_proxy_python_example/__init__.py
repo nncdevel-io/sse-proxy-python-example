@@ -1,2 +1,1 @@
 """SSE proxy example package."""
-

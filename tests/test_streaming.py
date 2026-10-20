@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 from openai import APIError
 from pydantic import SecretStr
@@ -114,7 +114,7 @@ async def test_aiohttp_stream_uses_ssl_context_connector() -> None:
 @pytest.mark.asyncio
 async def test_openai_sdk_stream_preserves_api_error_message() -> None:
     settings = Settings(api_key=SecretStr("secret"), model="test-model")
-    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    request = httpx2.Request("POST", "https://api.openai.com/v1/responses")
     api_error = APIError("quota exceeded", request, body={"code": "insufficient_quota"})
     client = MagicMock()
     client.responses.create.side_effect = api_error
